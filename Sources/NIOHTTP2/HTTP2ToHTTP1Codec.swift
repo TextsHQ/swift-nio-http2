@@ -649,14 +649,13 @@ extension HTTPHeaders {
         newHeaders.reserveCapacity(requestHead.headers.count + 3)
 
         // TODO(cory): This is potentially wrong if the URI contains more than just a path.
-        newHeaders.append((":path", requestHead.uri))
         newHeaders.append((":method", requestHead.method.rawValue))
-        newHeaders.append((":scheme", protocolString))
-
         // We store a place for the :authority header, even though we don't know what it is. We'll find it later and
         // change it when we do. This avoids us needing to potentially search this header block twice.
         var authorityHeader: String? = nil
         newHeaders.append((":authority", ""))
+        newHeaders.append((":scheme", protocolString))
+        newHeaders.append((":path", requestHead.uri))
 
         // Now fill in the others, except for any Host header we might find, which will become an :authority header.
         for header in requestHead.headers {
@@ -675,7 +674,7 @@ extension HTTPHeaders {
         guard let actualAuthorityHeader = authorityHeader else {
             throw NIOHTTP2Errors.missingHostHeader()
         }
-        newHeaders[3].1 = actualAuthorityHeader
+        newHeaders[1].1 = actualAuthorityHeader
 
         self.init(newHeaders)
     }
