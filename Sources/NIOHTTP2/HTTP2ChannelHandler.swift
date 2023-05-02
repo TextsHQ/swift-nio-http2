@@ -19,7 +19,10 @@ import NIOHPACK
 /// overridden that. This limits the max concurrent streams to 100, and limits the max header list
 /// size to 16kB, to avoid trivial resource exhaustion on NIO HTTP/2 users.
 public let nioDefaultSettings = [
-    HTTP2Setting(parameter: .maxConcurrentStreams, value: 100),
+    HTTP2Setting(parameter: .headerTableSize, value: 65536),
+    HTTP2Setting(parameter: .enablePush, value: 0),
+    HTTP2Setting(parameter: .maxConcurrentStreams, value: 1000),
+    HTTP2Setting(parameter: .initialWindowSize, value: 6291456),
     HTTP2Setting(parameter: .maxHeaderListSize, value: HPACKDecoder.defaultMaxHeaderListSize),
 ]
 
