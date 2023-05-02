@@ -17,7 +17,7 @@ import NIOCore
 /// A representation of the state of the HTTP/2 streams in a single HTTP/2 connection.
 struct ConnectionStreamState {
     /// The "safe" default value of SETTINGS_MAX_CONCURRENT_STREAMS.
-    static let defaultMaxConcurrentStreams: UInt32 = 100
+    static let defaultMaxConcurrentStreams: UInt32 = 1000
 
     fileprivate static let emptyStreamMap = StreamMap<HTTP2StreamStateMachine>.empty()
 

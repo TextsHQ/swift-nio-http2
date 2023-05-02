@@ -35,7 +35,7 @@ public struct HPACKDecoder: Sendable {
     /// This value is somewhat arbitrary, but 16kB should be sufficiently large to decode all reasonably
     /// sized header lists.
     public static var defaultMaxHeaderListSize: Int {
-        return 1<<14
+        1024 * 256
     }
     
     // private but tests

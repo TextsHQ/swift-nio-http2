@@ -31,7 +31,7 @@ struct HTTP2SettingsState {
 
     init(localState: Bool) {
         // Create the settings dictionary, and ensure it has space for the known SETTINGS values.
-        self.currentSettingsValues = [.headerTableSize: 4096, .enablePush: 1, .initialWindowSize: HTTP2SettingsState.defaultInitialWindowSize, .maxFrameSize: 1<<14]
+        self.currentSettingsValues = [.headerTableSize: 65536, .enablePush: 0, .initialWindowSize: HTTP2SettingsState.defaultInitialWindowSize, .maxFrameSize: 1<<14]
         self.currentSettingsValues.reserveCapacity(8)
 
         // Create space for the unacknowledged SETTINGS frame data to be stored. In general this will be empty,
@@ -71,7 +71,7 @@ struct HTTP2SettingsState {
     }
 
     /// The default value of SETTINGS_INITIAL_WINDOW_SIZE.
-    static let defaultInitialWindowSize: UInt32 = 65535
+    static let defaultInitialWindowSize: UInt32 = 6291456
 
     /// Called when SETTINGS are about to be emitted to the network.
     ///

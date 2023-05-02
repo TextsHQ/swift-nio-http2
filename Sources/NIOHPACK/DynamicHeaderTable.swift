@@ -18,7 +18,7 @@ import NIOCore
 /// [RFC 7541 § 2.3](https://httpwg.org/specs/rfc7541.html#dynamic.table).
 @usableFromInline
 struct DynamicHeaderTable: Sendable {
-    public static let defaultSize = 4096
+    public static let defaultSize = 65536
     
     /// The actual table, with items looked up by index.
     private var storage: HeaderTableStorage
