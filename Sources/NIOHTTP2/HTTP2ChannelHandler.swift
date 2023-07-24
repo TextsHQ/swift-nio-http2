@@ -26,7 +26,6 @@ public let nioDefaultSettings = [
     HTTP2Setting(parameter: .maxHeaderListSize, value: HPACKDecoder.defaultMaxHeaderListSize),
 ]
 
-
 /// ``NIOHTTP2Handler`` implements the HTTP/2 protocol for a single connection.
 ///
 /// This `ChannelHandler` takes a series of bytes and turns them into a sequence of ``HTTP2Frame`` objects.
@@ -183,11 +182,11 @@ public final class NIOHTTP2Handler: ChannelDuplexHandler {
 
     /// Constructs a ``NIOHTTP2Handler``.
     ///
-    /// - parameters:
-    ///     - mode: The mode for this handler, client or server.
-    ///     - initialSettings: The settings that will be advertised to the peer in the preamble. Defaults to ``nioDefaultSettings``.
-    ///     - headerBlockValidation: Whether to validate sent and received HTTP/2 header blocks. Defaults to ``ValidationState/enabled``.
-    ///     - contentLengthValidation: Whether to validate the content length of sent and received streams. Defaults to ``ValidationState/enabled``.
+    /// - Parameters:
+    ///   - mode: The mode for this handler, client or server.
+    ///   - initialSettings: The settings that will be advertised to the peer in the preamble. Defaults to ``nioDefaultSettings``.
+    ///   - headerBlockValidation: Whether to validate sent and received HTTP/2 header blocks. Defaults to ``ValidationState/enabled``.
+    ///   - contentLengthValidation: Whether to validate the content length of sent and received streams. Defaults to ``ValidationState/enabled``.
     public convenience init(mode: ParserMode,
                             initialSettings: HTTP2Settings = nioDefaultSettings,
                             headerBlockValidation: ValidationState = .enabled,
@@ -203,14 +202,14 @@ public final class NIOHTTP2Handler: ChannelDuplexHandler {
 
     /// Constructs a ``NIOHTTP2Handler``.
     ///
-    /// - parameters:
-    ///     - mode: The mode for this handler, client or server.
-    ///     - initialSettings: The settings that will be advertised to the peer in the preamble. Defaults to ``nioDefaultSettings``.
-    ///     - headerBlockValidation: Whether to validate sent and received HTTP/2 header blocks. Defaults to ``ValidationState/enabled``.
-    ///     - contentLengthValidation: Whether to validate the content length of sent and received streams. Defaults to ``ValidationState/enabled``.
-    ///     - maximumSequentialEmptyDataFrames: Controls the number of empty data frames this handler will tolerate receiving in a row before DoS protection
+    /// - Parameters:
+    ///   - mode: The mode for this handler, client or server.
+    ///   - initialSettings: The settings that will be advertised to the peer in the preamble. Defaults to ``nioDefaultSettings``.
+    ///   - headerBlockValidation: Whether to validate sent and received HTTP/2 header blocks. Defaults to ``ValidationState/enabled``.
+    ///   - contentLengthValidation: Whether to validate the content length of sent and received streams. Defaults to ``ValidationState/enabled``.
+    ///   - maximumSequentialEmptyDataFrames: Controls the number of empty data frames this handler will tolerate receiving in a row before DoS protection
     ///         is triggered and the connection is terminated. Defaults to 1.
-    ///     - maximumBufferedControlFrames: Controls the maximum buffer size of buffered outbound control frames. If we are unable to send control frames as
+    ///   - maximumBufferedControlFrames: Controls the maximum buffer size of buffered outbound control frames. If we are unable to send control frames as
     ///         fast as we produce them we risk building up an unbounded buffer and exhausting our memory. To protect against this DoS vector, we put an
     ///         upper limit on the depth of this queue. Defaults to 10,000.
     public convenience init(mode: ParserMode,
@@ -248,17 +247,17 @@ public final class NIOHTTP2Handler: ChannelDuplexHandler {
 
     /// Constructs a ``NIOHTTP2Handler``.
     ///
-    /// - parameters:
-    ///     - mode: The mode for this handler, client or server.
-    ///     - initialSettings: The settings that will be advertised to the peer in the preamble. Defaults to ``nioDefaultSettings``.
-    ///     - headerBlockValidation: Whether to validate sent and received HTTP/2 header blocks. Defaults to ``ValidationState/enabled``.
-    ///     - contentLengthValidation: Whether to validate the content length of sent and received streams. Defaults to ``ValidationState/enabled``.
-    ///     - maximumSequentialEmptyDataFrames: Controls the number of empty data frames this handler will tolerate receiving in a row before DoS protection
+    /// - Parameters:
+    ///   - mode: The mode for this handler, client or server.
+    ///   - initialSettings: The settings that will be advertised to the peer in the preamble. Defaults to ``nioDefaultSettings``.
+    ///   - headerBlockValidation: Whether to validate sent and received HTTP/2 header blocks. Defaults to ``ValidationState/enabled``.
+    ///   - contentLengthValidation: Whether to validate the content length of sent and received streams. Defaults to ``ValidationState/enabled``.
+    ///   - maximumSequentialEmptyDataFrames: Controls the number of empty data frames this handler will tolerate receiving in a row before DoS protection
     ///         is triggered and the connection is terminated. Defaults to 1.
-    ///     - maximumBufferedControlFrames: Controls the maximum buffer size of buffered outbound control frames. If we are unable to send control frames as
+    ///   - maximumBufferedControlFrames: Controls the maximum buffer size of buffered outbound control frames. If we are unable to send control frames as
     ///         fast as we produce them we risk building up an unbounded buffer and exhausting our memory. To protect against this DoS vector, we put an
     ///         upper limit on the depth of this queue. Defaults to 10,000.
-    ///     - tolerateImpossibleStateTransitionsInDebugMode: Whether impossible state transitions should be tolerated
+    ///   - tolerateImpossibleStateTransitionsInDebugMode: Whether impossible state transitions should be tolerated
     ///         in debug mode.
     internal init(mode: ParserMode,
                   initialSettings: HTTP2Settings = nioDefaultSettings,
@@ -991,11 +990,11 @@ extension NIOHTTP2Handler {
 
 extension NIOHTTP2Handler {
 #if swift(>=5.7)
-    /// The type of all `inboundStreamInitializer` callbacks.
-    public typealias StreamInitializer = @Sendable (Channel) -> EventLoopFuture<Void>
+    /// The type of all `inboundStreamInitializer` callbacks which do not need to return data.
+    public typealias StreamInitializer = NIOChannelInitializer
 #else
-    /// The type of all `inboundStreamInitializer` callbacks.
-    public typealias StreamInitializer = (Channel) -> EventLoopFuture<Void>
+    /// The type of all `inboundStreamInitializer` callbacks which need to return data.
+    public typealias StreamInitializer = NIOChannelInitializer
 #endif
 
     /// Creates a new ``NIOHTTP2Handler`` with a local multiplexer. (i.e. using
@@ -1030,6 +1029,9 @@ extension NIOHTTP2Handler {
     }
 
     /// Connection-level configuration.
+    ///
+    /// The settings that will be used when establishing the connection. These will be sent to the peer as part of the
+    /// handshake.
     public struct ConnectionConfiguration: Hashable, Sendable {
         public var initialSettings: HTTP2Settings = nioDefaultSettings
         public var headerBlockValidation: ValidationState = .enabled
@@ -1040,11 +1042,32 @@ extension NIOHTTP2Handler {
     }
 
     /// Stream-level configuration.
+    ///
+    /// The settings that will be used when establishing new streams. These mainly pertain to flow control.
     public struct StreamConfiguration: Hashable, Sendable {
         public var targetWindowSize: Int = 65535
         public var outboundBufferSizeHighWatermark: Int = 8196
         public var outboundBufferSizeLowWatermark: Int = 4092
         public init() {}
+    }
+
+    /// Overall connection and stream-level configuration.
+    public struct Configuration: Hashable, Sendable {
+        /// The settings that will be used when establishing the connection. These will be sent to the peer as part of the
+        /// handshake.
+        public var connection: ConnectionConfiguration
+        /// The settings that will be used when establishing new streams. These mainly pertain to flow control.
+        public var stream: StreamConfiguration
+
+        public init() {
+            self.connection = .init()
+            self.stream = .init()
+        }
+
+        public init(connection: ConnectionConfiguration, stream: StreamConfiguration) {
+            self.connection = connection
+            self.stream = stream
+        }
     }
 
     /// An `EventLoopFuture` which returns a ``StreamMultiplexer`` which can be used to create new outbound HTTP/2 streams.
@@ -1075,6 +1098,18 @@ extension NIOHTTP2Handler {
         switch self.inboundStreamMultiplexer {
         case let .some(.inline(multiplexer)):
             return StreamMultiplexer(multiplexer)
+        case .some(.legacy), .none:
+            throw NIOHTTP2Errors.missingMultiplexer()
+        }
+    }
+
+    @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+    internal func syncAsyncStreamMultiplexer<Output>(continuation: any ChannelContinuation, inboundStreamChannels: NIOHTTP2InboundStreamChannels<Output>) throws -> AsyncStreamMultiplexer<Output> {
+        self.eventLoop!.preconditionInEventLoop()
+
+        switch self.inboundStreamMultiplexer {
+        case let .some(.inline(multiplexer)):
+            return AsyncStreamMultiplexer(multiplexer, continuation: continuation, inboundStreamChannels: inboundStreamChannels)
         case .some(.legacy), .none:
             throw NIOHTTP2Errors.missingMultiplexer()
         }

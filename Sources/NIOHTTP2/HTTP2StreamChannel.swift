@@ -195,15 +195,10 @@ final class HTTP2StreamChannel: Channel, ChannelCore {
                     // This initializer callback can only be invoked if we already have a stream ID.
                     // So we force-unwrap here.
                     initializer(self, self.streamID!).whenComplete { result in
-                        switch result {
-                        case .success:
-                            self.postInitializerActivate(promise: promise)
-                        case .failure(let error):
-                            self.configurationFailed(withError: error, promise: promise)
-                        }
+                        self.onInitializationResult(result.map { self }, promise: promise)
                     }
                 } else {
-                    self.postInitializerActivate(promise: promise)
+                    self.postInitializerActivate(promise: promise, output: self)
                 }
             case .failure(let error):
                 self.configurationFailed(withError: error, promise: promise)
@@ -224,19 +219,43 @@ final class HTTP2StreamChannel: Channel, ChannelCore {
                 self.autoRead = autoRead
                 if let initializer = initializer {
                     initializer(self).whenComplete { result in
-                        switch result {
-                        case .success:
-                            self.postInitializerActivate(promise: promise)
-                        case .failure(let error):
-                            self.configurationFailed(withError: error, promise: promise)
-                        }
+                        self.onInitializationResult(result.map { self }, promise: promise)
                     }
                 } else {
-                    self.postInitializerActivate(promise: promise)
+                    self.postInitializerActivate(promise: promise, output: self)
                 }
             case .failure(let error):
                 self.configurationFailed(withError: error, promise: promise)
             }
+        }
+    }
+
+    internal func configure<Output>(initializer: @escaping NIOChannelInitializerWithOutput<Output>, userPromise promise: EventLoopPromise<Output>?) {
+        assert(self.streamDataType == .framePayload)
+        // We need to configure this channel. This involves doing four things:
+        // 1. Setting our autoRead state from the parent
+        // 2. Calling the initializer, if provided.
+        // 3. Activating when complete.
+        // 4. Catching errors if they occur.
+        self.getAutoReadFromParent { autoReadResult in
+            switch autoReadResult {
+            case .success(let autoRead):
+                self.autoRead = autoRead
+                initializer(self).whenComplete { result in
+                    self.onInitializationResult(result, promise: promise)
+                }
+            case .failure(let error):
+                self.configurationFailed(withError: error, promise: promise)
+            }
+        }
+    }
+
+    func onInitializationResult<Output>(_ initializerResult: Result<Output, Error>, promise: EventLoopPromise<Output>?) {
+        switch initializerResult {
+        case .success(let output):
+            self.postInitializerActivate(promise: promise, output: output)
+        case .failure(let error):
+            self.configurationFailed(withError: error, promise: promise)
         }
     }
 
@@ -257,7 +276,7 @@ final class HTTP2StreamChannel: Channel, ChannelCore {
     }
 
     /// Activates the channel if the parent channel is active and succeeds the given `promise`.
-    private func postInitializerActivate(promise: EventLoopPromise<Channel>?) {
+    private func postInitializerActivate<Output>(promise: EventLoopPromise<Output>?, output: Output) {
         // This force unwrap is safe as parent is assigned in the initializer, and never unassigned.
         // If parent is not active, we expect to receive a channelActive later.
         if self.parent!.isActive {
@@ -265,11 +284,11 @@ final class HTTP2StreamChannel: Channel, ChannelCore {
         }
 
         // We aren't using cascade here to avoid the allocations it causes.
-        promise?.succeed(self)
+        promise?.succeed(output)
     }
 
     /// Handle any error that occurred during configuration.
-    private func configurationFailed(withError error: Error, promise: EventLoopPromise<Channel>?) {
+    private func configurationFailed<Output>(withError error: Error, promise: EventLoopPromise<Output>?) {
         switch self.state {
         case .idle, .localActive, .closed:
             // The stream isn't open on the network, nothing to close.
@@ -781,8 +800,8 @@ private extension HTTP2StreamChannel {
 internal extension HTTP2StreamChannel {
     /// Called when a frame is received from the network.
     ///
-    /// - parameters:
-    ///     - frame: The `HTTP2Frame` received from the network.
+    /// - Parameters:
+    ///   - frame: The `HTTP2Frame` received from the network.
     func receiveInboundFrame(_ frame: HTTP2Frame) {
         guard self.state != .closed else {
             // Do nothing
@@ -809,9 +828,9 @@ internal extension HTTP2StreamChannel {
 
     /// Called when a frame is sent to the network.
     ///
-    /// - parameters:
-    ///     - frame: The `HTTP2Frame` to send to the network.
-    ///     - promise: The promise associated with the frame write.
+    /// - Parameters:
+    ///   - frame: The `HTTP2Frame` to send to the network.
+    ///   - promise: The promise associated with the frame write.
     private func receiveOutboundFrame(_ frame: HTTP2Frame, promise: EventLoopPromise<Void>?) {
         guard self.state != .closed else {
             let error = ChannelError.alreadyClosed
@@ -824,8 +843,8 @@ internal extension HTTP2StreamChannel {
 
     /// Called when a stream closure is received from the network.
     ///
-    /// - parameters:
-    ///     - reason: The reason received from the network, if any.
+    /// - Parameters:
+    ///   - reason: The reason received from the network, if any.
     func receiveStreamClosed(_ reason: HTTP2ErrorCode?) {
         // Avoid emitting any WINDOW_UPDATE frames now that we're closed.
         self.windowManager.closed = true
