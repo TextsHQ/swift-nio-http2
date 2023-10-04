@@ -71,7 +71,7 @@ struct HTTP2SettingsState {
     }
 
     /// The default value of SETTINGS_INITIAL_WINDOW_SIZE.
-    static let defaultInitialWindowSize: UInt32 = 6291456
+    static let defaultInitialWindowSize: UInt32 = 65535
 
     /// Called when SETTINGS are about to be emitted to the network.
     ///
