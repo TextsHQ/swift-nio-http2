@@ -22,7 +22,7 @@ public let nioDefaultSettings = [
     HTTP2Setting(parameter: .headerTableSize, value: 65536),
     HTTP2Setting(parameter: .enablePush, value: 0),
     HTTP2Setting(parameter: .maxConcurrentStreams, value: 1000),
-    HTTP2Setting(parameter: .initialWindowSize, value: 6291456),
+    HTTP2Setting(parameter: .initialWindowSize, value: 65535),
     HTTP2Setting(parameter: .maxHeaderListSize, value: HPACKDecoder.defaultMaxHeaderListSize),
 ]
 
