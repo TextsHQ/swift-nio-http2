@@ -203,13 +203,16 @@ final class ConfiguringPipelineAsyncMultiplexerTests: XCTestCase {
 
             // client
             for _ in 0 ..< requestCount {
-                let streamChannel = try await clientMultiplexer.createStreamChannel(
-                    configuration: .init(
-                        inboundType: HTTP2Frame.FramePayload.self,
-                        outboundType: HTTP2Frame.FramePayload.self
-                    )
-                ) { channel -> EventLoopFuture<Void> in
-                    channel.eventLoop.makeSucceededVoidFuture()
+                let streamChannel = try await clientMultiplexer.createStreamChannel() { channel in
+                    channel.eventLoop.makeCompletedFuture {
+                        try NIOAsyncChannel(
+                            synchronouslyWrapping: channel,
+                            configuration: .init(
+                                inboundType: HTTP2Frame.FramePayload.self,
+                                outboundType: HTTP2Frame.FramePayload.self
+                            )
+                        )
+                    }
                 }
                 // Let's try sending some requests
                 try await streamChannel.outboundWriter.write(ConfiguringPipelineAsyncMultiplexerTests.requestFramePayload)
@@ -254,7 +257,7 @@ final class ConfiguringPipelineAsyncMultiplexerTests: XCTestCase {
         // Let's pretend the TLS handler did protocol negotiation for us
         self.serverChannel.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: "h2"))
 
-        let negotiationResult = try await nioProtocolNegotiationResult.get().waitForFinalResult()
+        let negotiationResult = try await nioProtocolNegotiationResult.getResult()
 
         try await assertNoThrow(try await self.assertDoHandshake(client: self.clientChannel, server: self.serverChannel))
 
@@ -324,7 +327,7 @@ final class ConfiguringPipelineAsyncMultiplexerTests: XCTestCase {
         // Let's pretend the TLS handler did protocol negotiation for us
         self.serverChannel.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: "http/1.1"))
 
-        let negotiationResult = try await nioProtocolNegotiationResult.get().waitForFinalResult()
+        let negotiationResult = try await nioProtocolNegotiationResult.getResult()
 
         try await self.deliverAllBytes(from: self.clientChannel, to: self.serverChannel)
         try await self.deliverAllBytes(from: self.serverChannel, to: self.clientChannel)
