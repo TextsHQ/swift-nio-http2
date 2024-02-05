@@ -12,12 +12,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_spi(AsyncChannel) import NIOCore
+import NIOCore
 
+@usableFromInline
 internal struct InlineStreamMultiplexer {
     private let context: ChannelHandlerContext
 
-    private let commonStreamMultiplexer: HTTP2CommonInboundStreamMultiplexer
+    @usableFromInline
+    internal let _commonStreamMultiplexer: HTTP2CommonInboundStreamMultiplexer
+
     private let outboundView: NIOHTTP2Handler.OutboundView
 
     /// The delegate to be notified upon stream creation and close.
@@ -25,7 +28,7 @@ internal struct InlineStreamMultiplexer {
 
     init(context: ChannelHandlerContext, outboundView: NIOHTTP2Handler.OutboundView, mode: NIOHTTP2Handler.ParserMode, inboundStreamStateInitializer: MultiplexerAbstractChannel.InboundStreamStateInitializer, targetWindowSize: Int, streamChannelOutboundBytesHighWatermark: Int, streamChannelOutboundBytesLowWatermark: Int, streamDelegate: NIOHTTP2StreamDelegate?) {
         self.context = context
-        self.commonStreamMultiplexer = HTTP2CommonInboundStreamMultiplexer(
+        self._commonStreamMultiplexer = HTTP2CommonInboundStreamMultiplexer(
             mode: mode,
             channel: context.channel,
             inboundStreamStateInitializer: inboundStreamStateInitializer,
@@ -40,22 +43,22 @@ internal struct InlineStreamMultiplexer {
 
 extension InlineStreamMultiplexer: HTTP2InboundStreamMultiplexer {
     func receivedFrame(_ frame: HTTP2Frame) {
-        self.commonStreamMultiplexer.receivedFrame(frame, context: self.context, multiplexer: .inline(self))
+        self._commonStreamMultiplexer.receivedFrame(frame, context: self.context, multiplexer: .inline(self))
     }
 
     func streamError(streamID: HTTP2StreamID, error: Error) {
         let streamError = NIOHTTP2Errors.streamError(streamID: streamID, baseError: error)
-        self.commonStreamMultiplexer.streamError(context: self.context, streamError)
+        self._commonStreamMultiplexer.streamError(context: self.context, streamError)
     }
 
     func streamCreated(event: NIOHTTP2StreamCreatedEvent) {
-        if let childChannel = self.commonStreamMultiplexer.streamCreated(event: event) {
+        if let childChannel = self._commonStreamMultiplexer.streamCreated(event: event) {
             self.streamDelegate?.streamCreated(event.streamID, channel: childChannel)
         }
     }
 
     func streamClosed(event: StreamClosedEvent) {
-        if let childChannel = self.commonStreamMultiplexer.streamClosed(event: event) {
+        if let childChannel = self._commonStreamMultiplexer.streamClosed(event: event) {
             self.streamDelegate?.streamClosed(event.streamID, channel: childChannel)
         }
     }
@@ -65,16 +68,16 @@ extension InlineStreamMultiplexer: HTTP2InboundStreamMultiplexer {
             // This force-unwrap is safe: we always have a connection window.
             self.newConnectionWindowSize(newSize: event.inboundWindowSize!)
         } else {
-            self.commonStreamMultiplexer.childStreamWindowUpdated(event: event)
+            self._commonStreamMultiplexer.childStreamWindowUpdated(event: event)
         }
     }
 
     func initialStreamWindowChanged(event: NIOHTTP2BulkStreamWindowChangeEvent) {
-        self.commonStreamMultiplexer.initialStreamWindowChanged(event: event)
+        self._commonStreamMultiplexer.initialStreamWindowChanged(event: event)
     }
 
     private func newConnectionWindowSize(newSize: Int) {
-        guard let increment = self.commonStreamMultiplexer.newConnectionWindowSize(newSize) else {
+        guard let increment = self._commonStreamMultiplexer.newConnectionWindowSize(newSize) else {
             return
         }
 
@@ -90,7 +93,7 @@ extension InlineStreamMultiplexer: HTTP2OutboundStreamMultiplexer {
     }
 
     func flushStream(_ id: HTTP2StreamID) {
-        switch self.commonStreamMultiplexer.flushDesired() {
+        switch self._commonStreamMultiplexer.flushDesired() {
         case .proceed:
             self.outboundView.flush(context: self.context)
         case .waitForReadsToComplete:
@@ -99,33 +102,33 @@ extension InlineStreamMultiplexer: HTTP2OutboundStreamMultiplexer {
     }
 
     func requestStreamID(forChannel channel: NIOCore.Channel) -> HTTP2StreamID {
-        self.commonStreamMultiplexer.requestStreamID(forChannel: channel)
+        self._commonStreamMultiplexer.requestStreamID(forChannel: channel)
     }
 
     func streamClosed(channelID: ObjectIdentifier) {
-        self.commonStreamMultiplexer.childChannelClosed(channelID: channelID)
+        self._commonStreamMultiplexer.childChannelClosed(channelID: channelID)
     }
 
     func streamClosed(id: HTTP2StreamID) {
-        self.commonStreamMultiplexer.childChannelClosed(streamID: id)
+        self._commonStreamMultiplexer.childChannelClosed(streamID: id)
     }
 }
 
 extension InlineStreamMultiplexer {
     internal func propagateChannelActive() {
-        self.commonStreamMultiplexer.propagateChannelActive(context: self.context)
+        self._commonStreamMultiplexer.propagateChannelActive(context: self.context)
     }
 
     internal func propagateChannelInactive() {
-        self.commonStreamMultiplexer.propagateChannelInactive()
+        self._commonStreamMultiplexer.propagateChannelInactive()
     }
 
     internal func propagateChannelWritabilityChanged() {
-        self.commonStreamMultiplexer.propagateChannelWritabilityChanged(context: self.context)
+        self._commonStreamMultiplexer.propagateChannelWritabilityChanged(context: self.context)
     }
 
     internal func propagateReadComplete() {
-        switch self.commonStreamMultiplexer.propagateReadComplete() {
+        switch self._commonStreamMultiplexer.propagateReadComplete() {
         case .flushNow:
             // we had marked a flush as blocked by an active read which we may now perform
             self.outboundView.flush(context: self.context)
@@ -135,21 +138,22 @@ extension InlineStreamMultiplexer {
     }
 
     internal func processedFrame(frame: HTTP2Frame) {
-        self.commonStreamMultiplexer.processedFrame(streamID: frame.streamID, size: frame.payload.flowControlledSize)
+        self._commonStreamMultiplexer.processedFrame(streamID: frame.streamID, size: frame.payload.flowControlledSize)
     }
 }
 
 extension InlineStreamMultiplexer {
     internal func createStreamChannel(promise: EventLoopPromise<Channel>?, _ streamStateInitializer: @escaping NIOChannelInitializer) {
-        self.commonStreamMultiplexer.createStreamChannel(multiplexer: .inline(self), promise: promise, streamStateInitializer)
+        self._commonStreamMultiplexer.createStreamChannel(multiplexer: .inline(self), promise: promise, streamStateInitializer)
     }
 
     internal func createStreamChannel(_ streamStateInitializer: @escaping NIOChannelInitializer) -> EventLoopFuture<Channel> {
-        self.commonStreamMultiplexer.createStreamChannel(multiplexer: .inline(self), streamStateInitializer)
+        self._commonStreamMultiplexer.createStreamChannel(multiplexer: .inline(self), streamStateInitializer)
     }
 
+    @inlinable
     internal func createStreamChannel<Output: Sendable>(_ initializer: @escaping NIOChannelInitializerWithOutput<Output>) -> EventLoopFuture<Output> {
-        self.commonStreamMultiplexer.createStreamChannel(multiplexer: .inline(self), initializer)
+        self._commonStreamMultiplexer.createStreamChannel(multiplexer: .inline(self), initializer)
     }
 }
 
@@ -164,14 +168,15 @@ extension NIOHTTP2Handler {
     /// on ``HTTP2Frame/FramePayload`` objects as their base communication
     /// atom, as opposed to the regular NIO `SelectableChannel` objects which use `ByteBuffer`
     /// and `IOData`.
-    public struct StreamMultiplexer: @unchecked Sendable {
-        // '@unchecked Sendable' because this state is not intrinsically `Sendable`
-        // but it is only accessed in `createStreamChannel` which executes the work on the right event loop
-        private let inlineStreamMultiplexer: InlineStreamMultiplexer
+    public struct StreamMultiplexer: Sendable {
+        private let inlineStreamMultiplexer: InlineStreamMultiplexer.SendableView
+
+        private let eventLoop: EventLoop
 
         /// Cannot be created by users.
-        internal init(_ inlineStreamMultiplexer: InlineStreamMultiplexer) {
-            self.inlineStreamMultiplexer = inlineStreamMultiplexer
+        internal init(_ inlineStreamMultiplexer: InlineStreamMultiplexer, eventLoop: EventLoop) {
+            self.inlineStreamMultiplexer = InlineStreamMultiplexer.SendableView(inlineStreamMultiplexer, eventLoop: eventLoop)
+            self.eventLoop = eventLoop
         }
 
         /// Create a new `Channel` for a new stream initiated by this peer.
@@ -208,7 +213,7 @@ extension NIOHTTP2Handler {
 
 extension InlineStreamMultiplexer {
     func setChannelContinuation(_ streamChannels: any AnyContinuation) {
-        self.commonStreamMultiplexer.setChannelContinuation(streamChannels)
+        self._commonStreamMultiplexer.setChannelContinuation(streamChannels)
     }
 }
 
@@ -223,24 +228,85 @@ extension NIOHTTP2Handler {
     /// atom, as opposed to the regular NIO `SelectableChannel` objects which use `ByteBuffer`
     /// and `IOData`.
     ///
-    /// Outbound stream channel objects are initialized upon creation using the supplied `streamStateInitializer` which returns a type
+    /// Inbound (remotely-initiated) streams are accessible via the ``inbound`` property, having been initialized and
+    /// returned as the `InboundStreamOutput` type. 
+    ///
+    /// You can open a stream by calling ``openStream(_:)``. Locally-initiated stream channel objects are initialized upon creation using the supplied `initializer` which returns a type
     /// `Output`. This type may be `HTTP2Frame` or changed to any other type.
     @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
-    @_spi(AsyncChannel)
-    public struct AsyncStreamMultiplexer<InboundStreamOutput> {
-        private let inlineStreamMultiplexer: InlineStreamMultiplexer
-        public let inbound: NIOHTTP2InboundStreamChannels<InboundStreamOutput>
+    public struct AsyncStreamMultiplexer<InboundStreamOutput: Sendable>: Sendable {
+        @usableFromInline internal let _inlineStreamMultiplexer: InlineStreamMultiplexer.SendableView
+        public let inbound: NIOHTTP2AsyncSequence<InboundStreamOutput>
 
         // Cannot be created by users.
-        internal init(_ inlineStreamMultiplexer: InlineStreamMultiplexer, continuation: any AnyContinuation, inboundStreamChannels: NIOHTTP2InboundStreamChannels<InboundStreamOutput>) {
-            self.inlineStreamMultiplexer = inlineStreamMultiplexer
-            self.inlineStreamMultiplexer.setChannelContinuation(continuation)
+        @usableFromInline
+        internal init(_ inlineStreamMultiplexer: InlineStreamMultiplexer, eventLoop: EventLoop, continuation: any AnyContinuation, inboundStreamChannels: NIOHTTP2AsyncSequence<InboundStreamOutput>) {
+            self._inlineStreamMultiplexer = InlineStreamMultiplexer.SendableView(inlineStreamMultiplexer, eventLoop: eventLoop)
+            self._inlineStreamMultiplexer.setChannelContinuation(continuation)
             self.inbound = inboundStreamChannels
         }
 
-        /// Create a stream channel initialized with the provided closure
-        public func createStreamChannel<Output: Sendable>(_ initializer: @escaping NIOChannelInitializerWithOutput<Output>) async throws -> Output {
-            return try await self.inlineStreamMultiplexer.createStreamChannel(initializer).get()
+        /// - Parameter initializer: A closure that will be called upon the created stream which is responsible for
+        ///   initializing the stream's `Channel`.
+        /// - Returns: The result of the `initializer`.
+        @inlinable
+        public func openStream<Output: Sendable>(_ initializer: @escaping NIOChannelInitializerWithOutput<Output>) async throws -> Output {
+            return try await self._inlineStreamMultiplexer.createStreamChannel(initializer).get()
+        }
+    }
+}
+
+extension InlineStreamMultiplexer {
+    /// InlineStreamMultiplexer.SendableView exposes only the thread-safe API of InlineStreamMultiplexer
+    ///
+    /// We use unchecked Sendable here because we unconditionally hop so we are on the right event loop
+    /// from here on.
+    @usableFromInline
+    internal struct SendableView: @unchecked Sendable {
+        @usableFromInline internal let _inlineStreamMultiplexer: InlineStreamMultiplexer
+        @usableFromInline internal let _eventLoop: EventLoop
+
+        init(_ inlineStreamMultiplexer: InlineStreamMultiplexer, eventLoop: EventLoop) {
+            self._inlineStreamMultiplexer = inlineStreamMultiplexer
+            self._eventLoop = eventLoop
+        }
+
+        internal func createStreamChannel(promise: EventLoopPromise<Channel>?, _ streamStateInitializer: @escaping NIOHTTP2Handler.StreamInitializer) {
+            // Always create streams channels on the next event loop tick. This avoids re-entrancy
+            // issues where handlers interposed between the two HTTP/2 handlers could create streams
+            // in channel active which become activated twice.
+            self._eventLoop.execute {
+                self._inlineStreamMultiplexer.createStreamChannel(promise: promise, streamStateInitializer)
+            }
+        }
+
+        internal func createStreamChannel(_ initializer: @escaping NIOChannelInitializer) -> EventLoopFuture<Channel> {
+            // Always create streams channels on the next event loop tick. This avoids re-entrancy
+            // issues where handlers interposed between the two HTTP/2 handlers could create streams
+            // in channel active which become activated twice.
+            return self._eventLoop.flatSubmit {
+                self._inlineStreamMultiplexer.createStreamChannel(initializer)
+            }
+        }
+
+        @inlinable
+        internal func createStreamChannel<Output: Sendable>(_ initializer: @escaping NIOChannelInitializerWithOutput<Output>) -> EventLoopFuture<Output> {
+            // Always create streams channels on the next event loop tick. This avoids re-entrancy
+            // issues where handlers interposed between the two HTTP/2 handlers could create streams
+            // in channel active which become activated twice.
+            return self._eventLoop.flatSubmit {
+                self._inlineStreamMultiplexer.createStreamChannel(initializer)
+            }
+        }
+
+        internal func setChannelContinuation(_ streamChannels: any AnyContinuation) {
+            if self._eventLoop.inEventLoop {
+                return self._inlineStreamMultiplexer.setChannelContinuation(streamChannels)
+            } else {
+                self._eventLoop.execute {
+                    return self._inlineStreamMultiplexer.setChannelContinuation(streamChannels)
+                }
+            }
         }
     }
 }

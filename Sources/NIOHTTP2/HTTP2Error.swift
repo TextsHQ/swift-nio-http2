@@ -289,6 +289,11 @@ public enum NIOHTTP2Errors {
         return MissingMultiplexer(file: file, line: line)
     }
 
+    /// Creates a ``ExcessiveRSTFrames`` error with appropriate source context.
+    public static func excessiveRSTFrames(file: String = #fileID, line: UInt = #line) -> ExcessiveRSTFrames {
+        return ExcessiveRSTFrames(file: file, line: line)
+    }
+
     /// Creates a ``StreamError`` error with appropriate source context.
     ///
     /// - Parameters:
@@ -458,7 +463,9 @@ public enum NIOHTTP2Errors {
     /// An attempt was made to change the flow control window size, either via
     /// `SETTINGS` or `WINDOW_UPDATE`, but this change would move the flow control
     /// window size out of bounds.
-    public struct InvalidFlowControlWindowSize: NIOHTTP2Error, CustomStringConvertible {
+    public struct InvalidFlowControlWindowSize: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: Storage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -836,7 +843,9 @@ public enum NIOHTTP2Errors {
     }
 
     /// An attempt was made to use a currently unsupported feature.
-    public struct Unsupported: NIOHTTP2Error, CustomStringConvertible {
+    public struct Unsupported: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -928,7 +937,9 @@ public enum NIOHTTP2Errors {
     }
 
     /// A pseudo-header field is missing.
-    public struct MissingPseudoHeader: NIOHTTP2Error, CustomStringConvertible {
+    public struct MissingPseudoHeader: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+            // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -970,7 +981,9 @@ public enum NIOHTTP2Errors {
     }
 
     /// A pseudo-header field has been duplicated.
-    public struct DuplicatePseudoHeader: NIOHTTP2Error, CustomStringConvertible {
+    public struct DuplicatePseudoHeader: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -1012,7 +1025,8 @@ public enum NIOHTTP2Errors {
     }
 
     /// A header block contained a pseudo-header after a regular header.
-    public struct PseudoHeaderAfterRegularHeader: NIOHTTP2Error, CustomStringConvertible {
+    public struct PseudoHeaderAfterRegularHeader: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -1054,7 +1068,9 @@ public enum NIOHTTP2Errors {
     }
 
     /// An unknown pseudo-header was received.
-    public struct UnknownPseudoHeader: NIOHTTP2Error, CustomStringConvertible {
+    public struct UnknownPseudoHeader: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -1194,7 +1210,9 @@ public enum NIOHTTP2Errors {
     }
 
     /// A `:status` header was received with an invalid value.
-    public struct InvalidStatusValue: NIOHTTP2Error, CustomStringConvertible {
+    public struct InvalidStatusValue: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -1282,7 +1300,9 @@ public enum NIOHTTP2Errors {
     }
 
     /// An attempt was made to send a header field with a field name that is not valid in HTTP/2.
-    public struct InvalidHTTP2HeaderFieldName: NIOHTTP2Error, CustomStringConvertible {
+    public struct InvalidHTTP2HeaderFieldName: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: StringAndLocationStorage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -1325,7 +1345,9 @@ public enum NIOHTTP2Errors {
 
     /// Connection-specific header fields are forbidden in HTTP/2: this error is raised when one is
     /// sent or received.
-    public struct ForbiddenHeaderField: NIOHTTP2Error, CustomStringConvertible {
+    public struct ForbiddenHeaderField: NIOHTTP2Error, CustomStringConvertible, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private var storage: Storage
 
         private mutating func copyStorageIfNotUniquelyReferenced() {
@@ -1571,7 +1593,9 @@ public enum NIOHTTP2Errors {
     /// As they are a wrapper error, they carry a "real" error in ``baseError``. Additionally, they cannot
     /// meaningfully be `Equatable`, so they aren't. There's also no additional location information: that's
     /// provided by the base error.
-    public struct StreamError: Error {
+    public struct StreamError: Error, @unchecked Sendable {
+        // @unchecked Sendable because access is controlled by getters and copy-on-write setters giving this value semantics
+
         private final class Storage {
             var streamID: HTTP2StreamID
             var baseError: Error
@@ -1649,6 +1673,27 @@ public enum NIOHTTP2Errors {
 
     /// The ``NIOHTTP2Handler`` does not have a multiplexer but one has been accessed.
     public struct MissingMultiplexer: NIOHTTP2Error {
+        private let file: String
+        private let line: UInt
+
+        /// The location where the error was thrown.
+        public var location: String {
+            return _location(file: self.file, line: self.line)
+        }
+
+        fileprivate init(file: String, line: UInt) {
+            self.file = file
+            self.line = line
+        }
+
+        public static func ==(lhs: Self, rhs: Self) -> Bool {
+            return true
+        }
+    }
+
+
+    /// The client has issued RST frames at an excessive rate resulting in the connection being defensively closed.
+    public struct ExcessiveRSTFrames: NIOHTTP2Error {
         private let file: String
         private let line: UInt
 
